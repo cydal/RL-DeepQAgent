@@ -69,8 +69,8 @@ ROAD_BRIGHTNESS_THRESHOLD = 0.7
 # ==========================================
 # PHYSICS PARAMETERS - FIX ME!
 # ==========================================
-CAR_WIDTH = 7     
-CAR_HEIGHT = 5   
+CAR_WIDTH = 28     
+CAR_HEIGHT = 22   
 SENSOR_DIST = 150   # FIX ME! Distance sensors look ahead (pixels) - Currently unrealistic!
 SENSOR_ANGLE = 20   # FIX ME! Angle spread of sensors (degrees) - Too narrow!
 SPEED = 2           # FIX ME! Forward speed (pixels/step) - Way too fast!
@@ -524,8 +524,6 @@ class CarItem(QGraphicsItem):
                 pm = QPixmap(candidate)
                 if not pm.isNull():
                     self.car_pixmap = pm
-                    self.car_w = max(CAR_WIDTH, 32)
-                    self.car_h = max(CAR_HEIGHT, 32)
                     break
 
     def boundingRect(self):
