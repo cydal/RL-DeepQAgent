@@ -64,11 +64,13 @@ C_FAILURE   = QColor("#BF616A")
 C_SENSOR_ON = QColor("#A3BE8C") # Green
 C_SENSOR_OFF= QColor("#BF616A") # Red
 
+ROAD_BRIGHTNESS_THRESHOLD = 0.7
+
 # ==========================================
 # PHYSICS PARAMETERS - FIX ME!
 # ==========================================
-CAR_WIDTH = 14     
-CAR_HEIGHT = 8   
+CAR_WIDTH = 7     
+CAR_HEIGHT = 5   
 SENSOR_DIST = 150   # FIX ME! Distance sensors look ahead (pixels) - Currently unrealistic!
 SENSOR_ANGLE = 20   # FIX ME! Angle spread of sensors (degrees) - Too narrow!
 SPEED = 2           # FIX ME! Forward speed (pixels/step) - Way too fast!
@@ -227,7 +229,7 @@ class CarBrain:
 
                 c = QColor(self.map.pixel(int(px), int(py)))
                 brightness = (c.red() + c.green() + c.blue()) / 3.0 / 255.0
-                if brightness < 0.5:
+                if brightness < ROAD_BRIGHTNESS_THRESHOLD:
                     sensor_reading = dist_now / SENSOR_DIST
                     hit_x, hit_y = px, py
                     break
@@ -279,7 +281,7 @@ class CarBrain:
         
         car_center_val = self.check_pixel(self.car_pos.x(), self.car_pos.y())
         
-        if car_center_val < 0.4:
+        if car_center_val < ROAD_BRIGHTNESS_THRESHOLD:
             reward = -100
             done = True
             self.alive = False
