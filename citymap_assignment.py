@@ -65,15 +65,16 @@ C_SENSOR_ON = QColor("#A3BE8C") # Green
 C_SENSOR_OFF= QColor("#BF616A") # Red
 
 ROAD_BRIGHTNESS_THRESHOLD = 0.7
+BRIGHTNESS_REWARD_SCALE = 0.5
 
 # ==========================================
 # PHYSICS PARAMETERS - FIX ME!
 # ==========================================
-CAR_WIDTH = 28     
-CAR_HEIGHT = 22   
+CAR_WIDTH = 24     
+CAR_HEIGHT = 18   
 SENSOR_DIST = 150   # FIX ME! Distance sensors look ahead (pixels) - Currently unrealistic!
 SENSOR_ANGLE = 20   # FIX ME! Angle spread of sensors (degrees) - Too narrow!
-SPEED = 1           # FIX ME! Forward speed (pixels/step) - Way too fast!
+SPEED = 1.5           # FIX ME! Forward speed (pixels/step) - Way too fast!
 TURN_SPEED = 5      # FIX ME! Regular turn angle (degrees/step) - Too slow!
 SHARP_TURN = 10     # FIX ME! Sharp turn angle for tight corners (degrees) - Too small!
 
@@ -296,6 +297,10 @@ class CarBrain:
             else:
                 done = True
         else:
+            denom = max(1e-6, 1.0 - ROAD_BRIGHTNESS_THRESHOLD)
+            brightness_norm = (car_center_val - ROAD_BRIGHTNESS_THRESHOLD) / denom
+            brightness_norm = float(np.clip(brightness_norm, 0.0, 1.0))
+            reward += BRIGHTNESS_REWARD_SCALE * (2.0 * brightness_norm - 1.0)
             reward += (1.0 - next_state[8]) * 20
             if self.prev_dist is not None and dist > self.prev_dist:
                 reward -= 10
