@@ -70,8 +70,8 @@ BRIGHTNESS_REWARD_SCALE = 0.5
 # ==========================================
 # PHYSICS PARAMETERS - FIX ME!
 # ==========================================
-CAR_WIDTH = 24     
-CAR_HEIGHT = 18   
+CAR_WIDTH = 38     
+CAR_HEIGHT = 28   
 SENSOR_DIST = 150   # FIX ME! Distance sensors look ahead (pixels) - Currently unrealistic!
 SENSOR_ANGLE = 20   # FIX ME! Angle spread of sensors (degrees) - Too narrow!
 SPEED = 1.5           # FIX ME! Forward speed (pixels/step) - Way too fast!
