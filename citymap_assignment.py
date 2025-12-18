@@ -66,6 +66,8 @@ C_SENSOR_OFF= QColor("#BF616A") # Red
 
 ROAD_BRIGHTNESS_THRESHOLD = 0.7
 BRIGHTNESS_REWARD_SCALE = 0.5
+TURN_PENALTY_SCALE = 0.05
+TURN_DIRECTION_CHANGE_PENALTY = 0.1
 
 # ==========================================
 # PHYSICS PARAMETERS - FIX ME!
@@ -74,7 +76,7 @@ CAR_WIDTH = 38
 CAR_HEIGHT = 28   
 SENSOR_DIST = 150   # FIX ME! Distance sensors look ahead (pixels) - Currently unrealistic!
 SENSOR_ANGLE = 20   # FIX ME! Angle spread of sensors (degrees) - Too narrow!
-SPEED = 1.5           # FIX ME! Forward speed (pixels/step) - Way too fast!
+SPEED = 1.2           # FIX ME! Forward speed (pixels/step) - Way too fast!
 TURN_SPEED = 5      # FIX ME! Regular turn angle (degrees/step) - Too slow!
 SHARP_TURN = 10     # FIX ME! Sharp turn angle for tight corners (degrees) - Too small!
 
@@ -173,6 +175,7 @@ class CarBrain:
         self.score = 0
         self.sensor_coords = [] 
         self.prev_dist = None
+        self.prev_turn_sign = 0
 
     def set_start_pos(self, point):
         self.start_pos = point
@@ -251,9 +254,28 @@ class CarBrain:
         norm_dist = min(dist / 800.0, 1.0)
         norm_angle = angle_diff / 180.0
 
-        car_center_val = self.check_pixel(self.car_pos.x(), self.car_pos.y())
-        state = sensor_vals + [norm_angle, norm_dist, car_center_val]
+        car_surface_val = self.check_car_surface()
+        state = sensor_vals + [norm_angle, norm_dist, car_surface_val]
         return np.array(state, dtype=np.float32), dist
+
+    def check_car_surface(self):
+        rad = math.radians(self.car_angle)
+        forward = QPointF(math.cos(rad), math.sin(rad))
+        left = QPointF(-math.sin(rad), math.cos(rad))
+
+        half_w = CAR_WIDTH / 2
+        half_h = CAR_HEIGHT / 2
+
+        pts = [
+            self.car_pos,
+            self.car_pos + forward * half_w + left * half_h,
+            self.car_pos + forward * half_w - left * half_h,
+            self.car_pos - forward * half_w + left * half_h,
+            self.car_pos - forward * half_w - left * half_h,
+        ]
+
+        vals = [self.check_pixel(p.x(), p.y()) for p in pts]
+        return float(min(vals))
 
     def step(self, action):
         turn = 0
@@ -267,7 +289,13 @@ class CarBrain:
             turn = -SHARP_TURN
         elif action == 4: # Sharp right turn
             turn = SHARP_TURN
-        
+
+        turn_sign = 0
+        if turn > 0:
+            turn_sign = 1
+        elif turn < 0:
+            turn_sign = -1
+
         self.car_angle += turn
         rad = math.radians(self.car_angle)
         
@@ -280,10 +308,10 @@ class CarBrain:
         
         reward = -0.1
         done = False
-        
-        car_center_val = self.check_pixel(self.car_pos.x(), self.car_pos.y())
-        
-        if car_center_val < ROAD_BRIGHTNESS_THRESHOLD:
+
+        car_surface_val = self.check_car_surface()
+
+        if car_surface_val < ROAD_BRIGHTNESS_THRESHOLD:
             reward = -100
             done = True
             self.alive = False
@@ -298,9 +326,15 @@ class CarBrain:
                 done = True
         else:
             denom = max(1e-6, 1.0 - ROAD_BRIGHTNESS_THRESHOLD)
-            brightness_norm = (car_center_val - ROAD_BRIGHTNESS_THRESHOLD) / denom
+            brightness_norm = (car_surface_val - ROAD_BRIGHTNESS_THRESHOLD) / denom
             brightness_norm = float(np.clip(brightness_norm, 0.0, 1.0))
             reward += BRIGHTNESS_REWARD_SCALE * (2.0 * brightness_norm - 1.0)
+
+            reward -= TURN_PENALTY_SCALE * (abs(turn) / max(1e-6, SHARP_TURN))
+            if self.prev_turn_sign != 0 and turn_sign != 0 and (turn_sign != self.prev_turn_sign):
+                reward -= TURN_DIRECTION_CHANGE_PENALTY
+            self.prev_turn_sign = turn_sign
+
             reward += (1.0 - next_state[8]) * 20
             if self.prev_dist is not None and dist > self.prev_dist:
                 reward -= 10
