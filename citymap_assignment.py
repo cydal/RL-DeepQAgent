@@ -73,7 +73,7 @@ CAR_WIDTH = 28
 CAR_HEIGHT = 22   
 SENSOR_DIST = 150   # FIX ME! Distance sensors look ahead (pixels) - Currently unrealistic!
 SENSOR_ANGLE = 20   # FIX ME! Angle spread of sensors (degrees) - Too narrow!
-SPEED = 2           # FIX ME! Forward speed (pixels/step) - Way too fast!
+SPEED = 1           # FIX ME! Forward speed (pixels/step) - Way too fast!
 TURN_SPEED = 5      # FIX ME! Regular turn angle (degrees/step) - Too slow!
 SHARP_TURN = 10     # FIX ME! Sharp turn angle for tight corners (degrees) - Too small!
 
@@ -139,7 +139,7 @@ class CarBrain:
         self.w, self.h = map_image.width(), map_image.height()
         
         # RL Init
-        self.input_dim = 9  # 7 sensors + angle_to_target + distance_to_target
+        self.input_dim = 10  # 7 sensors + angle_to_target + distance_to_target
         self.n_actions = 5  # 0: left, 1: straight, 2: right, 3: sharp left, 4: sharp right 
         self.policy_net = DrivingDQN(self.input_dim, self.n_actions)
         self.target_net = DrivingDQN(self.input_dim, self.n_actions)
@@ -249,8 +249,9 @@ class CarBrain:
         
         norm_dist = min(dist / 800.0, 1.0)
         norm_angle = angle_diff / 180.0
-        
-        state = sensor_vals + [norm_angle, norm_dist]
+
+        car_center_val = self.check_pixel(self.car_pos.x(), self.car_pos.y())
+        state = sensor_vals + [norm_angle, norm_dist, car_center_val]
         return np.array(state, dtype=np.float32), dist
 
     def step(self, action):
@@ -704,6 +705,10 @@ class NeuralNavApp(QMainWindow):
         self.map_img = QImage(path).convertToFormat(QImage.Format.Format_RGB32)
         self.scene.clear()
         self.scene.addPixmap(QPixmap.fromImage(self.map_img))
+        if hasattr(self, "sensor_items"):
+            for s in self.sensor_items:
+                if s.scene() != self.scene:
+                    self.scene.addItem(s)
         self.brain = CarBrain(self.map_img)
         self.log(f"Map Loaded.")
 
@@ -772,6 +777,9 @@ class NeuralNavApp(QMainWindow):
         
         for s in self.sensor_items: 
             if s.scene() == self.scene: self.scene.removeItem(s)
+        for s in self.sensor_items:
+            if s.scene() != self.scene:
+                self.scene.addItem(s)
         self.lbl_status.setText("1. Click Map -> CAR\n2. Click Map -> TARGET(S)")
         self.lbl_status.setStyleSheet(f"background-color: {C_INFO_BG.name()}; color: white; padding: 10px; border-radius: 5px;")
         self.log("--- RESET ---")
