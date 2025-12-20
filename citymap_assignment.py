@@ -66,8 +66,10 @@ C_SENSOR_OFF= QColor("#BF616A") # Red
 
 ROAD_BRIGHTNESS_THRESHOLD = 0.7
 BRIGHTNESS_REWARD_SCALE = 0.5
-TURN_PENALTY_SCALE = 0.05
-TURN_DIRECTION_CHANGE_PENALTY = 0.1
+TURN_PENALTY_SCALE = 0.0
+TURN_DIRECTION_CHANGE_PENALTY = 0.0
+TARGET_RADIUS = 35
+PROGRESS_REWARD_SCALE = 0.05
 
 # ==========================================
 # PHYSICS PARAMETERS - FIX ME!
@@ -185,7 +187,12 @@ class CarBrain:
         self.alive = True
         self.score = 0
         self.car_pos = QPointF(self.start_pos.x(), self.start_pos.y())
-        self.car_angle = random.randint(0, 360)
+        if len(self.targets) > 0:
+            dx = self.targets[0].x() - self.car_pos.x()
+            dy = self.targets[0].y() - self.car_pos.y()
+            self.car_angle = math.degrees(math.atan2(dy, dx)) + random.uniform(-20, 20)
+        else:
+            self.car_angle = random.randint(0, 360)
         self.current_target_idx = 0
         self.targets_reached = 0
         if len(self.targets) > 0:
@@ -254,8 +261,8 @@ class CarBrain:
         norm_dist = min(dist / 800.0, 1.0)
         norm_angle = angle_diff / 180.0
 
-        car_surface_val = self.check_car_surface()
-        state = sensor_vals + [norm_angle, norm_dist, car_surface_val]
+        car_center_val = self.check_pixel(self.car_pos.x(), self.car_pos.y())
+        state = sensor_vals + [norm_angle, norm_dist, car_center_val]
         return np.array(state, dtype=np.float32), dist
 
     def check_car_surface(self):
@@ -309,13 +316,13 @@ class CarBrain:
         reward = -0.1
         done = False
 
-        car_surface_val = self.check_car_surface()
+        car_center_val = self.check_pixel(self.car_pos.x(), self.car_pos.y())
 
-        if car_surface_val < ROAD_BRIGHTNESS_THRESHOLD:
+        if car_center_val < ROAD_BRIGHTNESS_THRESHOLD:
             reward = -100
             done = True
             self.alive = False
-        elif dist < 20: 
+        elif dist < TARGET_RADIUS: 
             reward = 100
             has_next = self.switch_to_next_target()
             if has_next:
@@ -325,19 +332,24 @@ class CarBrain:
             else:
                 done = True
         else:
+            if self.prev_dist is not None:
+                reward += PROGRESS_REWARD_SCALE * (self.prev_dist - dist)
+
             denom = max(1e-6, 1.0 - ROAD_BRIGHTNESS_THRESHOLD)
-            brightness_norm = (car_surface_val - ROAD_BRIGHTNESS_THRESHOLD) / denom
+            brightness_norm = (car_center_val - ROAD_BRIGHTNESS_THRESHOLD) / denom
             brightness_norm = float(np.clip(brightness_norm, 0.0, 1.0))
             reward += BRIGHTNESS_REWARD_SCALE * (2.0 * brightness_norm - 1.0)
 
-            reward -= TURN_PENALTY_SCALE * (abs(turn) / max(1e-6, SHARP_TURN))
+            reward += (1.0 - next_state[8]) * 20
+
+            near_goal_weight = float(np.clip(dist / 120.0, 0.0, 1.0))
+            reward -= near_goal_weight * TURN_PENALTY_SCALE * (abs(turn) / max(1e-6, SHARP_TURN))
             if self.prev_turn_sign != 0 and turn_sign != 0 and (turn_sign != self.prev_turn_sign):
-                reward -= TURN_DIRECTION_CHANGE_PENALTY
+                reward -= near_goal_weight * TURN_DIRECTION_CHANGE_PENALTY
             self.prev_turn_sign = turn_sign
 
-            reward += (1.0 - next_state[8]) * 20
             if self.prev_dist is not None and dist > self.prev_dist:
-                reward -= 10
+                reward -= 1.0
             self.prev_dist = dist
             
         self.score += reward
